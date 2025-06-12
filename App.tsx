@@ -832,6 +832,7 @@ const App: React.FC = () => {
                   onClearData={handleClearAllData} 
                   onExportReportRequest={openReportInfoModal}
                   onRefreshReport={handleRefreshReportPreview}
+                  hasEvaluatedItems={hasEvaluatedItems}
                />;
       case 'riwayat':
         return <HistoryView 

@@ -8,16 +8,25 @@ interface ReportPreviewProps {
   projectName: string | null;
   onClearData: () => void; 
   onExportReportRequest: () => void;
-  onRefreshReport: () => void; // New prop for refreshing
+  onRefreshReport: () => void; 
+  hasEvaluatedItems: boolean; // New prop
 }
 
-const ReportPreview: React.FC<ReportPreviewProps> = ({ htmlContent, testerName, projectName, onClearData, onExportReportRequest, onRefreshReport }) => {
+const ReportPreview: React.FC<ReportPreviewProps> = ({ 
+    htmlContent, 
+    testerName, 
+    projectName, 
+    onClearData, 
+    onExportReportRequest, 
+    onRefreshReport,
+    hasEvaluatedItems 
+}) => {
   if (!htmlContent) {
     return (
       <div className="text-center py-16 bg-white rounded-xl shadow-xl p-8">
-        <FolderPlusIcon className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-        <p className="text-xl font-semibold text-slate-700 mb-2">Belum Ada Laporan</p>
-        <p className="text-slate-500 mb-6 max-w-md mx-auto">
+        <FolderPlusIcon className="w-16 h-16 text-slate-300 mx-auto mb-6" /> 
+        <p className="text-2xl font-semibold text-slate-700 mb-3">Belum Ada Laporan</p> 
+        <p className="text-slate-500 mb-8 max-w-md mx-auto">
           Untuk melihat laporan di sini, silakan unggah data dan sistem akan otomatis menampilkannya, atau gunakan tombol "Ekspor Hasil sebagai HTML" untuk membuat laporan dengan nama kustom. Anda juga bisa melihat laporan dari Riwayat.
         </p>
         <button
@@ -31,6 +40,8 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ htmlContent, testerName, 
       </div>
     );
   }
+
+  const isExportButtonActive = hasEvaluatedItems;
 
   return (
     <div className="bg-white rounded-xl shadow-xl overflow-hidden h-full flex flex-col">
@@ -58,11 +69,16 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ htmlContent, testerName, 
                 </button>
                 <button
                     onClick={onExportReportRequest}
-                    className="flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out"
-                    title="Ekspor laporan ini sebagai file HTML"
+                    disabled={!isExportButtonActive}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out
+                               ${isExportButtonActive 
+                                 ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                 : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                               }`}
+                    title={isExportButtonActive ? "Ekspor laporan ini sebagai file HTML" : "Evaluasi item terlebih dahulu untuk mengaktifkan ekspor"}
                     aria-label="Ekspor hasil sebagai HTML"
                 >
-                    <DownloadIcon className="w-4 h-4 mr-2" />
+                    <DownloadIcon className={`w-4 h-4 mr-2 ${isExportButtonActive ? 'text-white' : 'text-slate-400'}`} />
                     Ekspor HTML
                 </button>
                 <button
@@ -84,7 +100,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ htmlContent, testerName, 
       >
         <iframe
             srcDoc={htmlContent}
-            title={`Laporan Evaluasi - ${projectName} oleh ${testerName}`}
+            title={`Laporan Evaluasi - ${projectName || 'N/A'} oleh ${testerName || 'N/A'}`}
             className="w-full h-full border-none rounded-b-md"
             sandbox="allow-scripts allow-same-origin"
         />

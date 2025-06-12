@@ -363,23 +363,40 @@ export const generateHTMLReport = (
       border-radius: 6px; overflow: hidden;
       margin-bottom: 25px;
     }
-    th, td {
+    th, td { /* Common border for bottom of cells */
       border-bottom: 1px solid #e2e8f0; /* slate-200 */
-      padding: 10px 14px;
-      text-align: left; vertical-align: top;
-      text-align: justify; hyphens: auto; word-break: break-word;
+      /* text-align and padding for TD will be set below */
     }
-    td { border-left: 1px solid #e2e8f0; /* slate-200 */ color: #1e293b; /* slate-800 */ } 
+    td { 
+      padding: 10px 14px; /* Default TD padding */
+      text-align: justify; /* Text justification for content cells */
+      hyphens: auto; 
+      word-break: break-word;
+      vertical-align: top; /* Content cells align top */
+      border-left: 1px solid #e2e8f0; /* slate-200 - Vertical lines for TD */
+      color: #1e293b; /* slate-800 */ 
+    }
     td:first-child { border-left: none; }
-    th {
-      background-color: #f1f5f9; /* slate-100 */
+
+    th { /* Specific TH styling */
+      background-color: #e2e8f0; /* slate-200 - Was #f1f5f9 (slate-100) */
       color: #334155; /* slate-700 */
+      padding: 12px 15px; /* Was 10px 14px via (th,td) - more spacious */
+      text-align: left; /* Explicitly left for headers */
+      vertical-align: middle; /* Explicitly middle for headers */
       font-weight: 600;
-      font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em;
-      border-left: 1px solid #e2e8f0; /* slate-200 */
+      font-size: 0.9em; 
+      text-transform: uppercase; 
+      letter-spacing: 0.05em;
+      border-left: 1px solid #d1d5db; /* slate-300 - Was #e2e8f0 (slate-200). For vertical lines between THs. */
+    }
+    thead tr th { /* Target TH cells specifically within the THEAD */
+        border-bottom: 1px solid #cbd5e1; /* slate-300 - More distinct bottom border for header row */
     }
     th:first-child { border-left: none; }
-    tr:last-child td { border-bottom: none; }
+
+    tr:last-child td { border-bottom: none; } /* No bottom border for last row cells */
+    
     tr:nth-child(even) { background-color: #f8fafc; /* slate-50 */ } 
     tr:hover { background-color: #e0f2fe; /* sky-100 */ } 
 
