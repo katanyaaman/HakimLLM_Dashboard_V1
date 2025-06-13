@@ -2,7 +2,7 @@
 import React from 'react';
 import { EvaluatedQuestion, EvaluationStatus } from '../types';
 import LoadingSpinner from './LoadingSpinner';
-import { CheckCircleIcon, XCircleIcon, SparklesIcon, PlayIcon } from './IconComponents'; // Added PlayIcon
+import { CheckCircleIcon, XCircleIcon, SparklesIcon, PlayIcon, RefreshIcon } from './IconComponents'; // Added PlayIcon and RefreshIcon
 
 interface QuestionItemProps {
   item: EvaluatedQuestion;
@@ -13,7 +13,7 @@ interface QuestionItemProps {
 const QuestionItem: React.FC<QuestionItemProps> = ({ item, onEvaluate, onAdoptSuggestion }) => {
   const getStatus = (): EvaluationStatus => {
     if (item.isEvaluating) return EvaluationStatus.Evaluating;
-    if (item.evaluation?.error && item.evaluation.justification.includes("Tidak ada 'Jawaban LLM'")) return EvaluationStatus.Error; 
+    if (item.evaluation?.error && (item.evaluation.justification.includes("Tidak ada 'Jawaban LLM'") || item.evaluation.justification.includes("Jawaban LLM kosong"))) return EvaluationStatus.Error; 
     if (item.evaluation?.error) return EvaluationStatus.Error;
     if (item.evaluation) return EvaluationStatus.Success;
     return EvaluationStatus.Pending;
@@ -35,6 +35,11 @@ const QuestionItem: React.FC<QuestionItemProps> = ({ item, onEvaluate, onAdoptSu
     }
   };
 
+  const isRetryableError = status === EvaluationStatus.Error &&
+                           hasPreviousLlmAnswer && 
+                           item.evaluation && item.evaluation.error &&
+                           !(item.evaluation.justification.includes("Tidak ada 'Jawaban LLM'") || item.evaluation.justification.includes("Jawaban LLM kosong"));
+
   return (
     <div className="bg-white p-5 rounded-lg shadow-lg mb-4 transition-all duration-300 ease-in-out hover:shadow-sky-400/20">
       <div className="flex flex-col sm:flex-row justify-between sm:items-start mb-3 gap-2">
@@ -50,20 +55,33 @@ const QuestionItem: React.FC<QuestionItemProps> = ({ item, onEvaluate, onAdoptSu
               Skor: {item.evaluation.score.toFixed(2)}
             </span>
           )}
-           {status === EvaluationStatus.Error && item.evaluation?.justification.includes("Tidak ada 'Jawaban LLM'") && (
+           {status === EvaluationStatus.Error && (item.evaluation?.justification.includes("Tidak ada 'Jawaban LLM'") || item.evaluation?.justification.includes("Jawaban LLM kosong")) && (
              <span className="text-xs font-medium text-amber-600">(Jawaban LLM kosong)</span>
            )}
         </div>
+        
         {status !== EvaluationStatus.Evaluating && (
-          <button
-            onClick={() => onEvaluate(item.id)}
-            disabled={item.isEvaluating || !hasPreviousLlmAnswer}
-            title={!hasPreviousLlmAnswer ? "Tidak ada 'Jawaban LLM' untuk dievaluasi pada item ini." : (item.evaluation ? 'Evaluasi Ulang Jawaban LLM' : 'Evaluasi Jawaban LLM')}
-            className="flex items-center px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-medium rounded-md text-sm shadow-sm disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors duration-150 whitespace-nowrap"
-          >
-            <SparklesIcon className="w-4 h-4 mr-1.5" />
-            {item.evaluation && hasPreviousLlmAnswer ? 'Evaluasi Ulang' : 'Evaluasi'}
-          </button>
+          isRetryableError ? (
+            <button
+              onClick={() => onEvaluate(item.id)}
+              disabled={item.isEvaluating}
+              title="Ulangi evaluasi item ini karena terjadi error sebelumnya"
+              className="flex items-center px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium rounded-md text-sm shadow-sm disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors duration-150 whitespace-nowrap"
+            >
+              <RefreshIcon className="w-4 h-4 mr-1.5" />
+              Ulangi Evaluasi
+            </button>
+          ) : (
+            <button
+              onClick={() => onEvaluate(item.id)}
+              disabled={item.isEvaluating || !hasPreviousLlmAnswer}
+              title={!hasPreviousLlmAnswer ? "Tidak ada 'Jawaban LLM' untuk dievaluasi pada item ini." : (item.evaluation && !item.evaluation.error ? 'Evaluasi Ulang Jawaban LLM' : 'Evaluasi Jawaban LLM')}
+              className="flex items-center px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-medium rounded-md text-sm shadow-sm disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors duration-150 whitespace-nowrap"
+            >
+              <SparklesIcon className="w-4 h-4 mr-1.5" />
+              {(item.evaluation && !item.evaluation.error && hasPreviousLlmAnswer) ? 'Evaluasi Ulang' : 'Evaluasi'}
+            </button>
+          )
         )}
       </div>
 
@@ -115,7 +133,8 @@ const QuestionItem: React.FC<QuestionItemProps> = ({ item, onEvaluate, onAdoptSu
         </div>
       )}
 
-      {status === EvaluationStatus.Error && item.evaluation?.error && !item.evaluation.justification.includes("Tidak ada 'Jawaban LLM'") && (
+      {status === EvaluationStatus.Error && item.evaluation?.error && 
+        !(item.evaluation.justification.includes("Tidak ada 'Jawaban LLM'") || item.evaluation.justification.includes("Jawaban LLM kosong")) && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
           <p className="text-sm text-red-700 font-semibold">Kesalahan Evaluasi:</p>
           <p className="text-sm text-red-600 whitespace-pre-wrap break-words">{item.evaluation.justification || item.evaluation.error}</p>
