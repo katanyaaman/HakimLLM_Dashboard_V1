@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { FolderPlusIcon, ArrowLeftIcon, DownloadIcon, DocumentPlusIcon, RefreshIcon, PrinterIcon } from './IconComponents'; 
 
 interface ReportPreviewProps {
@@ -23,9 +23,46 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (iframe && htmlContent) {
+      const handleLoad = () => {
+        if (iframe.contentWindow) {
+          // Set a minimum height, e.g., 300px, or use scrollHeight
+          const scrollHeight = iframe.contentWindow.document.body.scrollHeight;
+          iframe.style.height = `${scrollHeight + 20}px`; // Add small buffer
+        }
+      };
+
+      // Set srcDoc first
+      iframe.srcdoc = htmlContent;
+      // Then add event listener
+      iframe.addEventListener('load', handleLoad);
+      
+      // Initial load might be missed if srcdoc is set before listener in some cases
+      // So, if already loaded (e.g. fast rendering), call handler manually
+      if (iframe.contentWindow && iframe.contentWindow.document.readyState === 'complete') {
+        handleLoad();
+      }
+
+      return () => {
+        iframe.removeEventListener('load', handleLoad);
+        // Clear srcdoc when htmlContent is null or component unmounts to prevent stale content
+        // iframe.srcdoc = ""; 
+      };
+    } else if (iframe) {
+      // If htmlContent becomes null, reset iframe height or hide it.
+      // For now, it's handled by the component returning a different view.
+      // If we kept the iframe, we'd do:
+      // iframe.style.height = '0px'; 
+      // iframe.srcdoc = "";
+    }
+  }, [htmlContent]);
+
+
   const handlePrintReport = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.focus(); // Fokus diperlukan untuk beberapa browser
+      iframeRef.current.contentWindow.focus(); 
       iframeRef.current.contentWindow.print();
     } else {
       alert("Tidak dapat mencetak laporan. Konten pratinjau tidak ditemukan.");
@@ -56,7 +93,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
   const isPrintButtonActive = !!htmlContent;
 
   return (
-    <div className="bg-white rounded-xl shadow-xl overflow-hidden h-full flex flex-col">
+    <div className="bg-white rounded-xl shadow-xl h-full flex flex-col"> {/* Removed overflow-hidden */}
         <div className="p-4 sm:p-5 bg-slate-100 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="flex items-center">
                 <DocumentPlusIcon className="w-7 h-7 text-sky-600 mr-3 hidden sm:block"/>
@@ -120,16 +157,17 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
       <div 
         className="report-preview-content flex-grow p-0.5 sm:p-1" 
-        style={{ width: '100%', border: 'none', overflow: 'hidden' }} 
+        style={{ width: '100%', border: 'none' }} // Removed overflow: hidden from style
         aria-live="polite" 
         aria-atomic="true"
       >
         <iframe
             ref={iframeRef}
-            srcDoc={htmlContent}
+            // srcDoc is now set in useEffect to ensure 'load' event fires reliably
             title={`Laporan Evaluasi - ${projectName || 'N/A'} oleh ${testerName || 'N/A'}`}
-            className="w-full h-full border-none rounded-b-md"
+            className="w-full border-none rounded-b-md" // Removed h-full
             sandbox="allow-scripts allow-same-origin allow-modals" 
+            scrolling="no" // Added scrolling="no"
         />
       </div>
     </div>
