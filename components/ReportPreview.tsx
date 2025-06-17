@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { FolderPlusIcon, ArrowLeftIcon, DownloadIcon, DocumentPlusIcon, RefreshIcon } from './IconComponents'; 
+import React, { useRef } from 'react';
+import { FolderPlusIcon, ArrowLeftIcon, DownloadIcon, DocumentPlusIcon, RefreshIcon, PrinterIcon } from './IconComponents'; 
 
 interface ReportPreviewProps {
   htmlContent: string | null;
@@ -9,7 +9,7 @@ interface ReportPreviewProps {
   onClearData: () => void; 
   onExportReportRequest: () => void;
   onRefreshReport: () => void; 
-  hasEvaluatedItems: boolean; // New prop
+  hasEvaluatedItems: boolean; 
 }
 
 const ReportPreview: React.FC<ReportPreviewProps> = ({ 
@@ -21,6 +21,17 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
     onRefreshReport,
     hasEvaluatedItems 
 }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const handlePrintReport = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.focus(); // Fokus diperlukan untuk beberapa browser
+      iframeRef.current.contentWindow.print();
+    } else {
+      alert("Tidak dapat mencetak laporan. Konten pratinjau tidak ditemukan.");
+    }
+  };
+
   if (!htmlContent) {
     return (
       <div className="text-center py-16 bg-white rounded-xl shadow-xl p-8">
@@ -42,6 +53,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
   }
 
   const isExportButtonActive = hasEvaluatedItems;
+  const isPrintButtonActive = !!htmlContent;
 
   return (
     <div className="bg-white rounded-xl shadow-xl overflow-hidden h-full flex flex-col">
@@ -60,12 +72,26 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                  <button
                     onClick={onRefreshReport}
-                    className="flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out"
+                    className="flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out"
                     title="Refresh pratinjau laporan dengan data terkini"
                     aria-label="Refresh pratinjau laporan"
                 >
                     <RefreshIcon className="w-4 h-4 mr-2" />
                     Refresh
+                </button>
+                <button
+                    onClick={handlePrintReport}
+                    disabled={!isPrintButtonActive}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out
+                               ${isPrintButtonActive 
+                                 ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                 : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                               }`}
+                    title={isPrintButtonActive ? "Cetak laporan ini atau simpan sebagai PDF" : "Konten laporan tidak tersedia untuk dicetak"}
+                    aria-label="Cetak Laporan"
+                >
+                    <PrinterIcon className={`w-4 h-4 mr-2 ${isPrintButtonActive ? 'text-white' : 'text-slate-400'}`} />
+                    Cetak
                 </button>
                 <button
                     onClick={onExportReportRequest}
@@ -99,10 +125,11 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         aria-atomic="true"
       >
         <iframe
+            ref={iframeRef}
             srcDoc={htmlContent}
             title={`Laporan Evaluasi - ${projectName || 'N/A'} oleh ${testerName || 'N/A'}`}
             className="w-full h-full border-none rounded-b-md"
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts allow-same-origin allow-modals" 
         />
       </div>
     </div>
