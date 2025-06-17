@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { EvaluatedQuestion, QuestionEntry, EvaluationResult, HistoryEntry, HistoryEventType, AnalyticsData } from './types'; // Added AnalyticsData
 import { parseCSV } from './services/csvParserService';
 import { parseXLSX } from './services/excelParserService';
@@ -12,7 +12,7 @@ import QuestionItem from './components/QuestionItem';
 import ErrorModal from './components/ErrorModal';
 import ReportInfoModal from './components/ReportInfoModal';
 import BatchEvaluationModal from './components/BatchEvaluationModal';
-import { FolderPlusIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TrashIcon } from './components/IconComponents'; // Added more icons
+import { FolderPlusIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TrashIcon, RefreshIcon } from './components/IconComponents'; // Added RefreshIcon
 import Layout from './components/Layout';
 import ReportPreview from './components/ReportPreview';
 import HistoryView from './components/HistoryView';
@@ -50,7 +50,7 @@ const App: React.FC = () => {
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
 
 
-  const [testStartTime, setTestStartTime] = useState<number | null>(null);
+  const [testStartTime, setTestStartTime] = useState<number | null>(null); // Maintained for potential future use, but report duration uses sum of evaluationMs
 
   const [activeView, setActiveView] = useState<ActiveView>('proyek');
   const [reportHtmlForPreview, setReportHtmlForPreview] = useState<string | null>(null);
@@ -149,7 +149,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (apiKeyMissing) {
       // API Key missing error is now primarily handled by LLMIntegrationView and evaluation guards
-      // setGlobalError(API_KEY_INFO); // Removed to avoid inline banner in Proyek view
     }
   }, [apiKeyMissing]);
 
@@ -158,7 +157,6 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = useCallback((fileContent: string | ArrayBuffer, fileType: 'csv' | 'xlsx') => {
-    // File loading state is handled by FileUpload component via setIsLoading prop
     let fileNameForHistory = loadedFileName || "File tidak diketahui";
     
     try {
@@ -175,7 +173,6 @@ const App: React.FC = () => {
         const noDataMessage = `File ${fileType.toUpperCase()} diproses, tetapi tidak ada baris data yang valid ditemukan. Harap periksa konten file, pastikan baris sesuai struktur header, dan tidak ada baris kosong berlebihan.`;
         setCsvErrorModalMessage(noDataMessage);
         setIsCsvErrorModalOpen(true);
-        // setGlobalError(`Tidak ada data valid yang ditemukan di file ${fileType.toUpperCase()}. Harap periksa format.`);
         setQuestionsData([]);
         setTestStartTime(null); 
         setReportHtmlForPreview(null);
@@ -184,13 +181,14 @@ const App: React.FC = () => {
       }
       setQuestionsData(parsedData.map(q => ({ ...q, isEvaluating: false })));
       if (parsedData.length > 0) {
+        // testStartTime is set, but report duration now uses sum of evaluationMs
         setTestStartTime(Date.now()); 
         addHistoryEntry('Unggah Data', `Berhasil memuat ${parsedData.length} item dari ${fileNameForHistory} (tipe: ${fileType.toUpperCase()}).`);
       } else {
         setTestStartTime(null); 
         addHistoryEntry('Unggah Data', `${fileNameForHistory} (tipe: ${fileType.toUpperCase()}) kosong atau tidak mengandung data valid.`);
       }
-      setGlobalError(null); // Clear any previous global errors
+      setGlobalError(null);
       setCsvErrorModalMessage(null);
       setReportHtmlForPreview(null); 
       setHistoricalAnalyticsToShow(null); 
@@ -202,7 +200,6 @@ const App: React.FC = () => {
       console.error(`Kesalahan Parsing ${fileType.toUpperCase()}:`, error);
       setCsvErrorModalMessage(errorMessage);
       setIsCsvErrorModalOpen(true);
-      // setGlobalError(null); // No inline global error
       setQuestionsData([]);
       setTestStartTime(null); 
       setReportHtmlForPreview(null);
@@ -213,7 +210,7 @@ const App: React.FC = () => {
 
   const handleEvaluateSingle = useCallback(async (id: string) => {
     if (apiKeyMissing) {
-      setCsvErrorModalMessage(API_KEY_INFO); // Show API key error in modal
+      setCsvErrorModalMessage(API_KEY_INFO); 
       setIsCsvErrorModalOpen(true);
       return;
     }
@@ -226,7 +223,7 @@ const App: React.FC = () => {
       if (questionToEvaluate.previousLlmAnswer === undefined || questionToEvaluate.previousLlmAnswer.trim() === "") {
         const noLlmAnswerMsg = "Tidak ada 'Jawaban LLM' yang diberikan dalam file untuk dievaluasi pada item ini.";
         setQuestionsData(prev => prev.map(q => q.id === id ? { ...q, evaluation: {isAppropriate: false, score:0, justification: noLlmAnswerMsg, error: noLlmAnswerMsg, evaluationDurationMs: 0 }, isEvaluating: false } : q));
-        setCsvErrorModalMessage(`Peringatan untuk item #${questionToEvaluate.number}: ${noLlmAnswerMsg}`); // Use modal for this feedback
+        setCsvErrorModalMessage(`Peringatan untuk item #${questionToEvaluate.number}: ${noLlmAnswerMsg}`); 
         setIsCsvErrorModalOpen(true);
         addHistoryEntry('Evaluasi Item', `Gagal untuk item #${questionToEvaluate.number}: ${noLlmAnswerMsg}`);
         return;
@@ -240,15 +237,15 @@ const App: React.FC = () => {
           evaluationPrompt
         );
         setQuestionsData(prev => prev.map(q => q.id === id ? { ...q, evaluation: result, isEvaluating: false } : q));
-        addHistoryEntry('Evaluasi Item', `Selesai untuk item #${questionToEvaluate.number}. Skor: ${result.score?.toFixed(2) ?? 'N/A'}. Penilaian: ${result.isAppropriate ? 'Sesuai' : 'Tidak Sesuai'}. Durasi: ${result.evaluationDurationMs}ms`);
+        addHistoryEntry('Evaluasi Item', `Selesai untuk item #${questionToEvaluate.number}. Skor: ${result.score?.toFixed(2) ?? 'N/A'}. Penilaian: ${result.isAppropriate ? 'Sesuai' : 'Tidak Sesuai'}. Durasi: ${result.evaluationDurationMs || 0}ms`);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan yang tidak diketahui selama evaluasi."
         const errorDuration = (err as any)?.evaluationDurationMs || 0;
         result = {isAppropriate: null, score:0, justification: `Evaluasi gagal: ${errorMessage}`, error: errorMessage, evaluationDurationMs: errorDuration};
         setQuestionsData(prev => prev.map(q => q.id === id ? { ...q, evaluation: result, isEvaluating: false } : q));
-        setCsvErrorModalMessage(`Kesalahan evaluasi untuk item #${questionToEvaluate.number}: ${errorMessage}`); // Use modal
+        setCsvErrorModalMessage(`Kesalahan evaluasi untuk item #${questionToEvaluate.number}: ${errorMessage}`); 
         setIsCsvErrorModalOpen(true);
-        addHistoryEntry('Evaluasi Item', `Gagal untuk item #${questionToEvaluate.number}: ${errorMessage}. Durasi: ${errorDuration}ms`);
+        addHistoryEntry('Evaluasi Item', `Gagal untuk item #${questionToEvaluate.number}: ${errorMessage}. Durasi: ${errorDuration || 0}ms`);
       }
     }
   }, [questionsData, evaluationPrompt, apiKeyMissing, addHistoryEntry]);
@@ -262,7 +259,7 @@ const App: React.FC = () => {
         setIsEvaluatingAll(false);
         setProcessedCount(0);
         setTotalToProcess(0);
-        addHistoryEntry('Evaluasi Batch', `Dibatalkan: Tidak ada item valid untuk diproses (Mode: ${mode}${batchParams ? ', Params: ' + batchParams : ''}).`);
+        addHistoryEntry('Evaluasi Batch', `Dibatalkan: Tidak ada item valid untuk diproses (Mode: ${mode}${batchParams ? ', Detail: ' + batchParams : ''}).`);
         return;
     }
 
@@ -303,7 +300,7 @@ const App: React.FC = () => {
     try {
         for (const item of itemsToProcess) {
             if (currentAbortSignal.aborted) {
-                batchErrorMessages += "Proses evaluasi semua item telah dibatalkan oleh pengguna. ";
+                batchErrorMessages += "Proses evaluasi batch telah dibatalkan oleh pengguna. ";
                 break; 
             }
 
@@ -312,7 +309,7 @@ const App: React.FC = () => {
             }
 
             if (currentAbortSignal.aborted) {
-                batchErrorMessages += "Proses evaluasi semua item telah dibatalkan oleh pengguna. ";
+                batchErrorMessages += "Proses evaluasi batch telah dibatalkan oleh pengguna. ";
                 break;
             }
             let evalResult: EvaluationResult;
@@ -345,7 +342,7 @@ const App: React.FC = () => {
         }
     } catch (loopError) {
         console.error("Kesalahan tak terduga dalam loop evaluasi semua:", loopError);
-        batchErrorMessages += "Terjadi kesalahan tak terduga selama proses evaluasi semua. ";
+        batchErrorMessages += "Terjadi kesalahan tak terduga selama proses evaluasi batch. ";
     } finally {
         setIsEvaluatingAll(false);
         setIsPaused(false);
@@ -367,14 +364,14 @@ const App: React.FC = () => {
           setIsCsvErrorModalOpen(true);
         }
 
-        let historyDetail = `Evaluasi batch (Mode: ${mode}${batchParams ? ', Params: ' + batchParams : ''}) selesai. Diproses: ${currentProcessed}/${itemsToProcess.length}. `;
+        let historyDetail = `Evaluasi batch (Mode: ${mode}${batchParams ? ', Detail: ' + batchParams : ''}) selesai. Diproses: ${currentProcessed}/${itemsToProcess.length}. `;
         historyDetail += `Sukses: ${localSucceedCount}, Tidak Sesuai: ${localNotAppropriateCount}, Error: ${localErrorCount}. Total Durasi LLM: ${formatDuration(totalBatchDurationMs)}.`;
         
         if (currentAbortSignal.aborted) {
             const cancelMsg = "Proses evaluasi telah dibatalkan oleh pengguna.";
             setCsvErrorModalMessage(prev => prev ? `${prev} ${cancelMsg}` : cancelMsg);
             setIsCsvErrorModalOpen(true);
-            historyDetail = `Evaluasi batch (Mode: ${mode}${batchParams ? ', Params: ' + batchParams : ''}) DIBATALKAN. Diproses: ${currentProcessed}/${itemsToProcess.length}. Total Durasi LLM: ${formatDuration(totalBatchDurationMs)}.`;
+            historyDetail = `Evaluasi batch (Mode: ${mode}${batchParams ? ', Detail: ' + batchParams : ''}) DIBATALKAN. Diproses: ${currentProcessed}/${itemsToProcess.length}. Total Durasi LLM: ${formatDuration(totalBatchDurationMs)}.`;
         }
         addHistoryEntry('Evaluasi Batch', historyDetail);
         abortControllerRef.current = null;
@@ -465,7 +462,6 @@ const App: React.FC = () => {
       setIsCsvErrorModalOpen(true);
       return;
     }
-    // Check if at least one item has been evaluated
     const hasAnyEvaluation = questionsData.some(q => q.evaluation);
     if (!hasAnyEvaluation) {
       setCsvErrorModalMessage("Tidak ada item yang telah dievaluasi. Harap evaluasi setidaknya satu item sebelum mengekspor laporan.");
@@ -558,7 +554,6 @@ const App: React.FC = () => {
     const validScoresList = evaluatedItemsList.map(q => q.evaluation?.score).filter(s => typeof s === 'number') as number[];
     const avgScore = validScoresList.length > 0 ? validScoresList.reduce((a, b) => a + b, 0) / validScoresList.length : 0;
     
-    // This is a simplified snapshot for history. The AnalitikView will perform full calculations.
     return {
         totalItems: data.length,
         evaluatedItemCount: evaluatedItemsList.length,
@@ -567,14 +562,14 @@ const App: React.FC = () => {
         proporsi: { 
             sesuai: evaluatedItemsList.filter(q => q.evaluation?.isAppropriate === true).length,
             tidakSesuai: evaluatedItemsList.filter(q => q.evaluation?.isAppropriate === false).length,
-            errorLlmAktual: evaluatedItemsList.filter(q => q.evaluation?.error && q.previousLlmAnswer && q.previousLlmAnswer.trim() !== "" && !q.evaluation.justification.includes("Tidak ada 'Jawaban LLM'")).length,
+            errorLlmAktual: evaluatedItemsList.filter(q => q.evaluation?.error && q.previousLlmAnswer && q.previousLlmAnswer.trim() !== "" && !(q.evaluation.justification?.includes("Tidak ada 'Jawaban LLM'") || q.evaluation.justification?.includes("Jawaban LLM kosong"))).length,
         },
         kinerjaPerTopik: [], 
         itemSkorTerendah: [], 
         scoreDistribution: { bins: [], maxCount: 0 }, 
         unprocessedSummary: { 
             belumDievaluasiSamaSekali: data.length - evaluatedItemsList.length,
-            llmAnswerKosong: data.filter(q => q.evaluation?.error && q.evaluation.justification.includes("Tidak ada 'Jawaban LLM'")).length,
+            llmAnswerKosong: data.filter(q => q.evaluation?.error && (q.evaluation.justification?.includes("Tidak ada 'Jawaban LLM'") || q.evaluation.justification?.includes("Jawaban LLM kosong"))).length,
         },
         averageTextLengths: { pertanyaan: "N/A", jawabanKb: "N/A", jawabanLlm: "N/A" }, 
         topikBermasalah: [], 
@@ -658,8 +653,8 @@ const App: React.FC = () => {
     setReportTesterNameForPreview("Tester Otomatis");
     setReportProjectNameForPreview("Proyek Otomatis");
     setHistoricalAnalyticsToShow(null);
-    setLoadedFileName(null); // Clear loaded file name
-    setIsFileLoading(false); // Reset file loading state
+    setLoadedFileName(null); 
+    setIsFileLoading(false); 
     if (itemCountBeforeClear > 0) {
       addHistoryEntry('Data Dihapus', `Semua data (${itemCountBeforeClear} item) dan hasil evaluasi telah dihapus.`);
     }
@@ -723,25 +718,51 @@ const App: React.FC = () => {
     addHistoryEntry('Analitik Dilihat', `Beralih ke analitik data saat ini.`);
   }, [setActiveView, addHistoryEntry]);
 
+  const retryableErroredItems = useMemo(() => {
+    return questionsData.filter(q =>
+        q.evaluation &&
+        q.evaluation.error &&
+        q.previousLlmAnswer && q.previousLlmAnswer.trim() !== "" &&
+        !(q.evaluation.justification?.includes("Tidak ada 'Jawaban LLM'") ||
+          q.evaluation.justification?.includes("Jawaban LLM kosong"))
+    );
+  }, [questionsData]);
+
+  const handleRetryErroredItems = useCallback(async () => {
+    if (apiKeyMissing) {
+      setCsvErrorModalMessage(API_KEY_INFO);
+      setIsCsvErrorModalOpen(true);
+      return;
+    }
+    
+    if (retryableErroredItems.length === 0) {
+      setCsvErrorModalMessage("Tidak ada item dengan error yang memenuhi syarat untuk dievaluasi ulang.");
+      setIsCsvErrorModalOpen(true);
+      return;
+    }
+  
+    await executeBulkEvaluation(retryableErroredItems, 'specific', 'Retry Errored Items');
+  }, [apiKeyMissing, retryableErroredItems, executeBulkEvaluation]);
+
 
   const isAnyItemIndividuallyEvaluating = questionsData.some(q => q.isEvaluating && !isEvaluatingAll);
   const isAnyProcessing = isAnyItemIndividuallyEvaluating || isEvaluatingAll || isFileLoading;
   const hasEvaluatedItems = questionsData.some(q => q.evaluation);
+  const hasRetryableErroredItems = retryableErroredItems.length > 0;
 
   const renderContent = () => {
     let succeedCount = 0;
     let notAppropriateCount = 0;
-    let errorCount = 0;
+    let actualErrorCount = 0;
 
     if (activeView === 'proyek' && questionsData.length > 0) {
         const evaluatedItems = questionsData.filter(q => q.evaluation);
         succeedCount = evaluatedItems.filter(q => q.evaluation!.isAppropriate === true).length;
         notAppropriateCount = evaluatedItems.filter(q => q.evaluation!.isAppropriate === false).length;
-        errorCount = evaluatedItems.filter(q => 
+        actualErrorCount = evaluatedItems.filter(q => 
             q.evaluation!.error &&
-            q.previousLlmAnswer && q.previousLlmAnswer.trim() !== "" && // Make sure there was an LLM answer to evaluate
-            !q.evaluation!.justification.includes("Tidak ada 'Jawaban LLM'") && // Exclude "LLM Answer was empty"
-            !q.evaluation!.justification.includes("Jawaban LLM kosong")
+            q.previousLlmAnswer && q.previousLlmAnswer.trim() !== "" && 
+            !(q.evaluation!.justification.includes("Tidak ada 'Jawaban LLM'") || q.evaluation!.justification.includes("Jawaban LLM kosong"))
         ).length;
     }
 
@@ -785,8 +806,17 @@ const App: React.FC = () => {
                     </span>
                     <span className="text-xs text-slate-600 flex items-center">
                       <ExclamationTriangleIcon className="w-4 h-4 mr-1 text-yellow-500" />
-                      Error: <span className="font-medium ml-1 text-yellow-700">{errorCount}</span>
+                      Error Aktual: <span className="font-medium ml-1 text-yellow-700">{actualErrorCount}</span>
                     </span>
+                     <button
+                        onClick={handleRetryErroredItems}
+                        disabled={!hasRetryableErroredItems || isAnyProcessing}
+                        className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-md text-xs shadow-sm disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                        title="Evaluasi ulang item yang menghasilkan error (bukan karena jawaban kosong)"
+                      >
+                        <RefreshIcon className="w-3.5 h-3.5 mr-1 inline-block" />
+                        Ulangi Error ({retryableErroredItems.length})
+                      </button>
                     <button
                       onClick={handleClearAllData}
                       disabled={isAnyProcessing}
@@ -809,7 +839,7 @@ const App: React.FC = () => {
               </div>
             )}
              {questionsData.length > 0 && (
-                <div className="mt-0 space-y-5"> {/* Removed mt-6 to make it closer to the new bar */}
+                <div className="mt-0 space-y-5"> 
                     {questionsData.map(item => (
                         <QuestionItem
                         key={item.id}
