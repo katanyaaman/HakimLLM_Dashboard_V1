@@ -1,6 +1,5 @@
-
 import React, { useRef, useEffect } from 'react';
-import { FolderPlusIcon, ArrowLeftIcon, DownloadIcon, DocumentPlusIcon, RefreshIcon, PrinterIcon } from './IconComponents'; 
+import { FolderPlusIcon, ArrowLeftIcon, DownloadIcon, DocumentPlusIcon, RefreshIcon } from './IconComponents'; 
 
 interface ReportPreviewProps {
   htmlContent: string | null;
@@ -60,15 +59,6 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
   }, [htmlContent]);
 
 
-  const handlePrintReport = () => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.focus(); 
-      iframeRef.current.contentWindow.print();
-    } else {
-      alert("Tidak dapat mencetak laporan. Konten pratinjau tidak ditemukan.");
-    }
-  };
-
   if (!htmlContent) {
     return (
       <div className="text-center py-16 bg-white rounded-xl shadow-xl p-8">
@@ -90,7 +80,6 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
   }
 
   const isExportButtonActive = hasEvaluatedItems;
-  const isPrintButtonActive = !!htmlContent;
 
   return (
     <div className="bg-white rounded-xl shadow-xl h-full flex flex-col"> {/* Removed overflow-hidden */}
@@ -115,20 +104,6 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                 >
                     <RefreshIcon className="w-4 h-4 mr-2" />
                     Refresh
-                </button>
-                <button
-                    onClick={handlePrintReport}
-                    disabled={!isPrintButtonActive}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center px-4 py-2 font-medium rounded-md shadow-sm text-sm transition-colors duration-150 ease-in-out
-                               ${isPrintButtonActive 
-                                 ? 'bg-green-500 hover:bg-green-600 text-white' 
-                                 : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                               }`}
-                    title={isPrintButtonActive ? "Cetak laporan ini atau simpan sebagai PDF" : "Konten laporan tidak tersedia untuk dicetak"}
-                    aria-label="Cetak Laporan"
-                >
-                    <PrinterIcon className={`w-4 h-4 mr-2 ${isPrintButtonActive ? 'text-white' : 'text-slate-400'}`} />
-                    Cetak
                 </button>
                 <button
                     onClick={onExportReportRequest}
